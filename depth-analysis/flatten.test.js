@@ -292,8 +292,8 @@ describe('Edge Cases', () => {
 });
 
 describe('Random Layout Statistics', () => {
-  it('should generate and analyze 10000 random layouts', () => {
-    const numLayouts = 10000;
+  it('should generate and analyze 100000 random layouts', { timeout: 30000 }, () => {
+    const numLayouts = 100000;
     const stats = {
       originalDepths: {},
       flattenedDepths: {},
@@ -317,7 +317,7 @@ describe('Random Layout Statistics', () => {
       stats.maxFlattened = Math.max(stats.maxFlattened, flattenedDepth);
     }
 
-    console.log('\n=== RANDOM LAYOUT STATISTICS (10,000 layouts) ===\n');
+    console.log('\n=== RANDOM LAYOUT STATISTICS (100,000 layouts) ===\n');
     console.log('Original Depth Distribution:');
     Object.keys(stats.originalDepths).sort((a, b) => a - b).forEach(depth => {
       const count = stats.originalDepths[depth];
