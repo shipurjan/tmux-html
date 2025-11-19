@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>tmux Pane Simulator</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      font-family: monospace; 
+      background: #1e1e1e; 
+      color: #fff;
+      overflow: hidden;
+      height: 100vh;
+    }
+    
+    #root { 
+      width: 100vw; 
+      height: 100vh; 
+      display: flex;
+    }
+    
+    .pane-container {
+      display: flex;
+      flex: 1;
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    
+    .pane-wrapper {
+      display: flex;
+      min-width: 50px;
+      min-height: 50px;
+    }
+    
+    .pane {
+      background: #2d2d2d;
+      border: 1px solid #3e3e3e;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      flex: 1;
+      width: 100%;
+      height: 100%;
+    }
+    
+    .pane.active {
+      border-color: #00ff00;
+    }
+    
+    .pane-header {
+      background: #1a1a1a;
+      padding: 4px 8px;
+      font-size: 11px;
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid #3e3e3e;
+      flex-shrink: 0;
+      justify-content: flex-end;
+      align-items: center;
+    }
+    
+    .pane-content {
+      flex: 1;
+      padding: 8px;
+      overflow: auto;
+      cursor: text;
+    }
+    
+    button {
+      background: #3e3e3e;
+      color: #fff;
+      border: none;
+      padding: 2px 6px;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 11px;
+    }
+    
+    button:hover {
+      background: #4e4e4e;
+    }
+
+    button:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    button:disabled:hover {
+      background: #3e3e3e;
+    }
+
+    .split-btn {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #4e4e4e;
+      color: #fff;
+      border: 2px solid #00ff00;
+      cursor: pointer;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+    }
+
+    .split-btn:hover {
+      background: #5e5e5e;
+    }
+
+    .split-btn-bottom {
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .split-btn-right {
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .resizer {
+      background: #3e3e3e;
+      position: relative;
+      z-index: 10;
+      flex-shrink: 0;
+    }
+    
+    .resizer:hover {
+      background: #00ff00;
+    }
+    
+    .resizer.horizontal {
+      cursor: ns-resize;
+      height: 4px;
+      width: 100%;
+    }
+    
+    .resizer.vertical {
+      cursor: ew-resize;
+      width: 4px;
+      height: 100%;
+    }
+    
+    .h-split { flex-direction: column; }
+    .v-split { flex-direction: row; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+
+    const LOG_LEVELS = {
+      debug: 0,
+      info: 1,
+      warn: 2,
+      error: 3
+    };
+
+    class Logger {
+      constructor(prefix, level = LOG_LEVELS.debug) {
+        this.prefix = prefix;
+        this.level = level;
+      }
+
+      safeStringify(object) {
+        if (object === null || object === undefined) return '';
+
+        const cache = new Set();
+        return JSON.stringify(
+          object,
+          (_key, value) => {
+            if (typeof value === 'object' && value !== null) {
+              if (cache.has(value)) {
+                return '[Circular]';
+              }
+              cache.add(value);
+            }
+            return value;
+          },
+          2
+        );
+      }
+
+      debug(message, data) {
+        if (this.level >= LOG_LEVELS.debug) {
+          console.debug(`[${this.prefix}] DEBUG: ${message}`, data ? this.safeStringify(data) : '');
+        }
+      }
+    }
+
+    const logger = new Logger('tmux');
+
+    let idCounter = 0;
+    const genId = () => `pane-${idCounter++}`;
+
+    function Pane({ id, onSplit, isActive, onActivate, onDelete, totalPanes }) {
+      return (
+        <div
+          className={`pane ${isActive ? 'active' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onActivate(id);
+          }}
+        >
+          <div className="pane-header">
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(id); }}
+              disabled={totalPanes === 1}
+              title={totalPanes === 1 ? "Cannot delete last pane" : "Delete pane"}
+            >
+              ×
+            </button>
+          </div>
+          <div className="pane-content">
+          </div>
+          {isActive && (
+            <>
+              <button
+                className="split-btn split-btn-bottom"
+                onClick={(e) => { e.stopPropagation(); onSplit(id, 'h'); }}
+                title="Split horizontally"
+              >
+                +
+              </button>
+              <button
+                className="split-btn split-btn-right"
+                onClick={(e) => { e.stopPropagation(); onSplit(id, 'v'); }}
+                title="Split vertically"
+              >
+                +
+              </button>
+            </>
+          )}
+        </div>
+      );
+    }
+
+    function Resizer({ direction, onResize }) {
+      const isDragging = useRef(false);
+      const startPos = useRef(0);
+      const containerRef = useRef(null);
+
+      useEffect(() => {
+        const handleMouseMove = (e) => {
+          if (!isDragging.current) return;
+          const delta = direction === 'h' 
+            ? e.clientY - startPos.current 
+            : e.clientX - startPos.current;
+          onResize(delta);
+          startPos.current = direction === 'h' ? e.clientY : e.clientX;
+        };
+
+        const handleMouseUp = () => {
+          isDragging.current = false;
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+
+        return () => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+        };
+      }, [direction, onResize]);
+
+      const handleMouseDown = (e) => {
+        isDragging.current = true;
+        startPos.current = direction === 'h' ? e.clientY : e.clientX;
+        e.preventDefault();
+      };
+
+      return (
+        <div 
+          ref={containerRef}
+          className={`resizer ${direction === 'h' ? 'horizontal' : 'vertical'}`}
+          onMouseDown={handleMouseDown}
+        />
+      );
+    }
+
+    function PaneContainer({ node, onSplit, onDelete, totalPanes, activeId, onActivate }) {
+      if (!node.children) {
+        return (
+          <Pane
+            id={node.id}
+            onSplit={onSplit}
+            onDelete={onDelete}
+            totalPanes={totalPanes}
+            isActive={activeId === node.id}
+            onActivate={onActivate}
+          />
+        );
+      }
+
+      const [sizes, setSizes] = useState(node.children.map(() => 1));
+      const containerRef = useRef(null);
+
+      const handleResize = (index, delta) => {
+        if (!containerRef.current) return;
+        
+        setSizes(prev => {
+          const newSizes = [...prev];
+          const containerSize = node.split === 'h' 
+            ? containerRef.current.offsetHeight 
+            : containerRef.current.offsetWidth;
+          
+          const total = newSizes.reduce((a, b) => a + b, 0);
+          const deltaRatio = (delta / containerSize) * total;
+          
+          newSizes[index] = Math.max(0.1, newSizes[index] + deltaRatio);
+          newSizes[index + 1] = Math.max(0.1, newSizes[index + 1] - deltaRatio);
+          
+          return newSizes;
+        });
+      };
+
+      return (
+        <div ref={containerRef} className={`pane-container ${node.split === 'h' ? 'h-split' : 'v-split'}`}>
+          {node.children.map((child, i) => (
+            <React.Fragment key={child.id}>
+              <div className="pane-wrapper" style={{ flex: sizes[i] }}>
+                <PaneContainer
+                  node={child}
+                  onSplit={onSplit}
+                  onDelete={onDelete}
+                  totalPanes={totalPanes}
+                  activeId={activeId}
+                  onActivate={onActivate}
+                />
+              </div>
+              {i < node.children.length - 1 && (
+                <Resizer
+                  direction={node.split}
+                  onResize={(delta) => handleResize(i, delta)}
+                />
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+      );
+    }
+
+    const countTotalPanes = (node) => {
+      if (!node.children) return 1;
+      return node.children.reduce((sum, child) => sum + countTotalPanes(child), 0);
+    };
+
+    const findFirstPaneId = (node) => {
+      if (!node.children) return node.id;
+      return findFirstPaneId(node.children[0]);
+    };
+
+    const removePaneAndCollapse = (node, paneId) => {
+      if (!node) return null;
+
+      if (!node.children) {
+        return node.id === paneId ? null : node;
+      }
+
+      const newChildren = node.children
+        .map(child => removePaneAndCollapse(child, paneId))
+        .filter(child => child !== null);
+
+      if (newChildren.length === 0) return null;
+      if (newChildren.length === 1) return newChildren[0];
+
+      return { ...node, children: newChildren };
+    };
+
+    function App() {
+      const [tree, setTree] = useState({ id: genId() });
+      const [activeId, setActiveId] = useState(tree.id);
+
+      useEffect(() => {
+        logger.debug('Tree structure', tree);
+      }, [tree]);
+
+      const splitPane = (targetId, direction) => {
+        const split = (node) => {
+          if (node.id === targetId) {
+            return {
+              id: node.id,
+              split: direction,
+              children: [
+                { id: genId() },
+                { id: genId() }
+              ]
+            };
+          }
+          if (node.children) {
+            return {
+              ...node,
+              children: node.children.map(split)
+            };
+          }
+          return node;
+        };
+        setTree(prev => split(prev));
+      };
+
+      const deletePane = (paneId) => {
+        if (countTotalPanes(tree) === 1) return;
+
+        const newTree = removePaneAndCollapse(tree, paneId);
+
+        if (newTree) {
+          setTree(newTree);
+          if (activeId === paneId) {
+            setActiveId(findFirstPaneId(newTree));
+          }
+        }
+      };
+
+      const totalPanes = countTotalPanes(tree);
+
+      return (
+        <PaneContainer
+          node={tree}
+          onSplit={splitPane}
+          onDelete={deletePane}
+          totalPanes={totalPanes}
+          activeId={activeId}
+          onActivate={setActiveId}
+        />
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
