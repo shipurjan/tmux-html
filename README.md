@@ -2,6 +2,8 @@
 
 Tmux-style pane manager in a single HTML file. Split, resize, and delete panes with mouse support. No build required - just open in browser.
 
+https://shipurjan.github.io/tmux-html/
+
 ## Usage
 
 Open `tmux.html` in a browser. Click panes to activate, use `+` buttons to split, drag dividers to resize, click `×` to delete.
