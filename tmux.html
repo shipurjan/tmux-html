@@ -30,7 +30,7 @@
       left: 0;
       right: 0;
       bottom: 0;
-      border: 3px solid #4a9eff;
+      border: 1px solid #00ff00;
       border-top: none;
       pointer-events: none;
       z-index: 99;
@@ -56,14 +56,14 @@
 
     .root-handle:hover {
       background: #2a2a2a;
-      color: #4a9eff;
+      color: #00ff00;
     }
 
     .root-handle.active {
       background: #2a2a2a;
-      color: #4a9eff;
-      border: 3px solid #4a9eff;
-      border-bottom: 3px solid #4a9eff;
+      color: #00ff00;
+      border: 1px solid #00ff00;
+      border-bottom: 1px solid #00ff00;
     }
 
     .pane-container-wrapper {
@@ -158,80 +158,68 @@
     }
 
     .split-btn {
-      position: absolute;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: #4e4e4e;
-      color: #fff;
-      border: 2px solid #00ff00;
-      cursor: pointer;
-      font-size: 18px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 5;
-    }
-
-    .split-btn:hover {
-      background: #5e5e5e;
-    }
-
-    .split-btn-bottom {
-      bottom: 8px;
-      left: 50%;
-      transform: translateX(-50%);
-    }
-
-    .split-btn-right {
-      right: 8px;
-      top: 50%;
-      transform: translateY(-50%);
-    }
-
-    .viewport-split-btn {
-      position: fixed;
       width: 40px;
       height: 40px;
       border-radius: 50%;
       background: #3e3e3e;
-      color: #4a9eff;
+      color: #fff;
       border: 2px solid #5e5e5e;
       cursor: pointer;
       font-size: 20px;
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 100;
       opacity: 0.6;
       transition: opacity 0.2s, background 0.2s;
     }
 
-    .viewport-split-btn:hover {
+    .split-btn:hover {
       background: #4e4e4e;
       opacity: 1;
-      border-color: #4a9eff;
+      border-color: #00ff00;
     }
 
-    .viewport-split-btn-top {
-      top: 32px;
-      left: 50%;
-      transform: translateX(-50%);
+    .split-btn-pane {
+      position: absolute;
+      z-index: 5;
     }
 
-    .viewport-split-btn-bottom {
+    .split-btn-pane-bottom {
       bottom: 8px;
       left: 50%;
       transform: translateX(-50%);
     }
 
-    .viewport-split-btn-left {
+    .split-btn-pane-right {
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .split-btn-viewport {
+      position: fixed;
+      z-index: 100;
+    }
+
+    .split-btn-viewport-top {
+      top: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .split-btn-viewport-bottom {
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .split-btn-viewport-left {
       left: 8px;
       top: 50%;
       transform: translateY(-50%);
     }
 
-    .viewport-split-btn-right {
+    .split-btn-viewport-right {
       right: 8px;
       top: 50%;
       transform: translateY(-50%);
@@ -353,7 +341,7 @@
           {isActive && (
             <>
               <button
-                className="split-btn split-btn-bottom"
+                className="split-btn split-btn-pane split-btn-pane-bottom"
                 onClick={(e) => {
                   e.stopPropagation();
                   logger.debug('Split horizontal button clicked', { paneId: id, direction: 'h' });
@@ -364,7 +352,7 @@
                 +
               </button>
               <button
-                className="split-btn split-btn-right"
+                className="split-btn split-btn-pane split-btn-pane-right"
                 onClick={(e) => {
                   e.stopPropagation();
                   logger.debug('Split vertical button clicked', { paneId: id, direction: 'v' });
@@ -613,7 +601,7 @@
             className={`root-handle ${isRootActive ? 'active' : ''}`}
             onClick={handleRootActivate}
           >
-            root
+            ~ tmux
           </div>
           <div className="pane-container-wrapper">
             <PaneContainer
@@ -629,28 +617,28 @@
             <>
               <div className="root-active-indicator" />
               <button
-                className="viewport-split-btn viewport-split-btn-top"
+                className="split-btn split-btn-viewport split-btn-viewport-top"
                 onClick={() => wrapRootWithSplit('h', 'before')}
                 title="Add pane above"
               >
                 +
               </button>
               <button
-                className="viewport-split-btn viewport-split-btn-bottom"
+                className="split-btn split-btn-viewport split-btn-viewport-bottom"
                 onClick={() => wrapRootWithSplit('h', 'after')}
                 title="Add pane below"
               >
                 +
               </button>
               <button
-                className="viewport-split-btn viewport-split-btn-left"
+                className="split-btn split-btn-viewport split-btn-viewport-left"
                 onClick={() => wrapRootWithSplit('v', 'before')}
                 title="Add pane to left"
               >
                 +
               </button>
               <button
-                className="viewport-split-btn viewport-split-btn-right"
+                className="split-btn split-btn-viewport split-btn-viewport-right"
                 onClick={() => wrapRootWithSplit('v', 'after')}
                 title="Add pane to right"
               >
