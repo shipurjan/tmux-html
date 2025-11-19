@@ -90,7 +90,6 @@
     }
     
     .pane {
-      background: #2d2d2d;
       border: 1px solid #3e3e3e;
       display: flex;
       flex-direction: column;
@@ -314,10 +313,23 @@
 
     const genId = () => crypto.randomUUID();
 
-    function Pane({ id, onSplit, isActive, onActivate, onDelete, totalPanes }) {
+    const generateGrayShade = () => {
+      const base = 0x2d;
+      const variation = Math.floor(Math.random() * 20) - 10;
+      const value = Math.max(0x20, Math.min(0x40, base + variation));
+      return `#${value.toString(16).padStart(2, '0')}${value.toString(16).padStart(2, '0')}${value.toString(16).padStart(2, '0')}`;
+    };
+
+    const createPane = () => ({
+      id: genId(),
+      color: generateGrayShade()
+    });
+
+    function Pane({ id, color, onSplit, isActive, onActivate, onDelete, totalPanes }) {
       return (
         <div
           className={`pane ${isActive ? 'active' : ''}`}
+          style={{ background: color }}
           onClick={(e) => {
             e.stopPropagation();
             logger.debug('Pane clicked', { paneId: id });
@@ -416,6 +428,7 @@
         return (
           <Pane
             id={node.id}
+            color={node.color}
             onSplit={onSplit}
             onDelete={onDelete}
             totalPanes={totalPanes}
@@ -501,8 +514,9 @@
     };
 
     function App() {
-      const [tree, setTree] = useState({ id: genId() });
-      const [activeId, setActiveId] = useState(tree.id);
+      const initialPane = createPane();
+      const [tree, setTree] = useState(initialPane);
+      const [activeId, setActiveId] = useState(initialPane.id);
       const [isRootActive, setIsRootActive] = useState(false);
 
       useEffect(() => {
@@ -516,21 +530,19 @@
           logger.debug('split visiting node', { nodeId: node.id, hasChildren: !!node.children });
 
           if (node.id === targetId) {
-            const newId1 = genId();
-            const newId2 = genId();
+            const pane1 = { id: genId(), color: node.color };
+            const pane2 = createPane();
             logger.debug('splitting target node', {
               targetId,
               direction,
-              newId1,
-              newId2
+              newId1: pane1.id,
+              newId2: pane2.id,
+              inheritedColor: node.color
             });
             return {
               id: node.id,
               split: direction,
-              children: [
-                { id: newId1 },
-                { id: newId2 }
-              ]
+              children: [pane1, pane2]
             };
           }
           if (node.children) {
@@ -571,7 +583,7 @@
       const wrapRootWithSplit = (direction, position) => {
         logger.debug('wrapRootWithSplit called', { direction, position, treeBefore: tree });
 
-        const newPane = { id: genId() };
+        const newPane = createPane();
         const newRoot = {
           id: genId(),
           split: direction,
