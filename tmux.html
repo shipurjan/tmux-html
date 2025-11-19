@@ -17,9 +17,59 @@
       height: 100vh;
     }
     
-    #root { 
-      width: 100vw; 
-      height: 100vh; 
+    #root {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      position: relative;
+    }
+
+    .root-active-indicator {
+      position: fixed;
+      top: 24px;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border: 3px solid #00ff00;
+      border-top: none;
+      pointer-events: none;
+      z-index: 99;
+    }
+
+    .root-handle {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 24px;
+      background: #1a1a1a;
+      border-bottom: 1px solid #3e3e3e;
+      cursor: pointer;
+      z-index: 101;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #666;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .root-handle:hover {
+      background: #2a2a2a;
+      color: #00ff00;
+    }
+
+    .root-handle.active {
+      background: #2a2a2a;
+      color: #00ff00;
+      border-bottom-color: #00ff00;
+    }
+
+    .pane-container-wrapper {
+      margin-top: 24px;
+      height: calc(100vh - 24px);
+      width: 100%;
+      position: relative;
       display: flex;
     }
     
@@ -29,6 +79,7 @@
       position: relative;
       width: 100%;
       height: 100%;
+      z-index: 1;
     }
     
     .pane-wrapper {
@@ -52,23 +103,35 @@
       border-color: #00ff00;
     }
     
-    .pane-header {
-      background: #1a1a1a;
-      padding: 4px 8px;
-      font-size: 11px;
-      display: flex;
-      gap: 8px;
-      border-bottom: 1px solid #3e3e3e;
-      flex-shrink: 0;
-      justify-content: flex-end;
-      align-items: center;
+    .delete-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      z-index: 5;
+      background: #4a2020;
+      border: 1px solid #5a3030;
+    }
+
+    .delete-btn:hover {
+      background: #5a2828;
+    }
+
+    .delete-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      background: #3a1818;
+    }
+
+    .delete-btn:disabled:hover {
+      background: #3a1818;
     }
     
     .pane-content {
-      flex: 1;
+      width: 100%;
+      height: 100%;
       padding: 8px;
       overflow: auto;
-      cursor: text;
+      cursor: normal;
     }
     
     button {
@@ -121,6 +184,54 @@
     }
 
     .split-btn-right {
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .viewport-split-btn {
+      position: fixed;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #3e3e3e;
+      color: #00ff00;
+      border: 2px solid #5e5e5e;
+      cursor: pointer;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0.6;
+      transition: opacity 0.2s, background 0.2s;
+    }
+
+    .viewport-split-btn:hover {
+      background: #4e4e4e;
+      opacity: 1;
+      border-color: #00ff00;
+    }
+
+    .viewport-split-btn-top {
+      top: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .viewport-split-btn-bottom {
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .viewport-split-btn-left {
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .viewport-split-btn-right {
       right: 8px;
       top: 50%;
       transform: translateY(-50%);
@@ -212,15 +323,14 @@
             onActivate(id);
           }}
         >
-          <div className="pane-header">
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(id); }}
-              disabled={totalPanes === 1}
-              title={totalPanes === 1 ? "Cannot delete last pane" : "Delete pane"}
-            >
-              ×
-            </button>
-          </div>
+          <button
+            className="delete-btn"
+            onClick={(e) => { e.stopPropagation(); onDelete(id); }}
+            disabled={totalPanes === 1}
+            title={totalPanes === 1 ? "Cannot delete last pane" : "Delete pane"}
+          >
+            ×
+          </button>
           <div className="pane-content">
           </div>
           {isActive && (
@@ -380,6 +490,7 @@
     function App() {
       const [tree, setTree] = useState({ id: genId() });
       const [activeId, setActiveId] = useState(tree.id);
+      const [isRootActive, setIsRootActive] = useState(false);
 
       useEffect(() => {
         logger.debug('Tree structure', tree);
@@ -421,17 +532,80 @@
         }
       };
 
+      const wrapRootWithSplit = (direction, position) => {
+        const newPane = { id: genId() };
+        const newRoot = {
+          id: tree.id,
+          split: direction,
+          children: position === 'before' ? [newPane, tree] : [tree, newPane]
+        };
+        setTree(newRoot);
+        setActiveId(newPane.id);
+      };
+
+      const handlePaneActivate = (paneId) => {
+        setIsRootActive(false);
+        setActiveId(paneId);
+      };
+
+      const handleRootActivate = () => {
+        setIsRootActive(true);
+      };
+
       const totalPanes = countTotalPanes(tree);
 
       return (
-        <PaneContainer
-          node={tree}
-          onSplit={splitPane}
-          onDelete={deletePane}
-          totalPanes={totalPanes}
-          activeId={activeId}
-          onActivate={setActiveId}
-        />
+        <>
+          <div
+            className={`root-handle ${isRootActive ? 'active' : ''}`}
+            onClick={handleRootActivate}
+          >
+            tmux
+          </div>
+          <div className="pane-container-wrapper">
+            <PaneContainer
+              node={tree}
+              onSplit={splitPane}
+              onDelete={deletePane}
+              totalPanes={totalPanes}
+              activeId={isRootActive ? null : activeId}
+              onActivate={handlePaneActivate}
+            />
+          </div>
+          {isRootActive && (
+            <>
+              <div className="root-active-indicator" />
+              <button
+                className="viewport-split-btn viewport-split-btn-top"
+                onClick={() => wrapRootWithSplit('h', 'before')}
+                title="Add pane above"
+              >
+                +
+              </button>
+              <button
+                className="viewport-split-btn viewport-split-btn-bottom"
+                onClick={() => wrapRootWithSplit('h', 'after')}
+                title="Add pane below"
+              >
+                +
+              </button>
+              <button
+                className="viewport-split-btn viewport-split-btn-left"
+                onClick={() => wrapRootWithSplit('v', 'before')}
+                title="Add pane to left"
+              >
+                +
+              </button>
+              <button
+                className="viewport-split-btn viewport-split-btn-right"
+                onClick={() => wrapRootWithSplit('v', 'after')}
+                title="Add pane to right"
+              >
+                +
+              </button>
+            </>
+          )}
+        </>
       );
     }
 
