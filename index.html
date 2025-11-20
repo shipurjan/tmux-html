@@ -568,25 +568,33 @@
               inheritedColor: node.color
             });
             return {
-              id: containerId,
-              split: direction,
-              children: [pane1, pane2]
+              node: {
+                id: containerId,
+                split: direction,
+                children: [pane1, pane2]
+              },
+              newPaneId: pane2.id
             };
           }
           if (node.children) {
+            let foundPaneId = null;
+            const newChildren = node.children.map(child => {
+              const result = split(child);
+              if (result.newPaneId) foundPaneId = result.newPaneId;
+              return result.node;
+            });
             return {
-              ...node,
-              children: node.children.map(split)
+              node: { ...node, children: newChildren },
+              newPaneId: foundPaneId
             };
           }
-          return node;
+          return { node, newPaneId: null };
         };
 
-        setTree(prev => {
-          const newTree = split(prev);
-          logger.debug('splitPane complete', { treeAfter: newTree });
-          return newTree;
-        });
+        const result = split(tree);
+        setTree(result.node);
+        setActiveId(result.newPaneId);
+        logger.debug('splitPane complete', { treeAfter: result.node, newPaneId: result.newPaneId });
       };
 
       const deletePane = (paneId) => {

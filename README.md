@@ -6,8 +6,6 @@ https://shipurjan.github.io/tmux-html/
 
 ## Usage
 
-Open `index.html` in a browser.
-
 There are two clickable elements:
 
 **Panes** (the colored areas):
