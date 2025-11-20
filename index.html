@@ -23,56 +23,6 @@
       display: flex;
       position: relative;
     }
-
-    .root-active-indicator {
-      position: fixed;
-      top: 24px;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      border: 1px solid #00ff00;
-      border-top: none;
-      pointer-events: none;
-      z-index: 99;
-    }
-
-    .root-handle {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 24px;
-      background: #1a1a1a;
-      border-bottom: 1px solid #3e3e3e;
-      cursor: pointer;
-      z-index: 101;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-      color: #666;
-      transition: background 0.2s, color 0.2s, border 0.2s;
-    }
-
-    .root-handle:hover {
-      background: #2a2a2a;
-      color: #00ff00;
-    }
-
-    .root-handle.active {
-      background: #2a2a2a;
-      color: #00ff00;
-      border: 1px solid #00ff00;
-      border-bottom: 1px solid #00ff00;
-    }
-
-    .pane-container-wrapper {
-      margin-top: 24px;
-      height: calc(100vh - 24px);
-      width: 100%;
-      position: relative;
-      display: flex;
-    }
     
     .pane-container {
       display: flex;
@@ -82,7 +32,11 @@
       height: 100%;
       z-index: 1;
     }
-    
+
+    .pane-container.active {
+      border: 1px solid #00ff00;
+    }
+
     .pane-wrapper {
       display: flex;
       min-width: 50px;
@@ -196,30 +150,30 @@
       transform: translateY(-50%);
     }
 
-    .split-btn-viewport {
-      position: fixed;
+    .split-btn-container {
+      position: absolute;
       z-index: 100;
     }
 
-    .split-btn-viewport-top {
-      top: 32px;
+    .split-btn-container-top {
+      top: 8px;
       left: 50%;
       transform: translateX(-50%);
     }
 
-    .split-btn-viewport-bottom {
+    .split-btn-container-bottom {
       bottom: 8px;
       left: 50%;
       transform: translateX(-50%);
     }
 
-    .split-btn-viewport-left {
+    .split-btn-container-left {
       left: 8px;
       top: 50%;
       transform: translateY(-50%);
     }
 
-    .split-btn-viewport-right {
+    .split-btn-container-right {
       right: 8px;
       top: 50%;
       transform: translateY(-50%);
@@ -368,16 +322,18 @@
       );
     }
 
-    function Resizer({ direction, onResize }) {
+    function Resizer({ direction, onResize, containerId, onActivateContainer }) {
       const isDragging = useRef(false);
+      const hasDragged = useRef(false);
       const startPos = useRef(0);
       const containerRef = useRef(null);
 
       useEffect(() => {
         const handleMouseMove = (e) => {
           if (!isDragging.current) return;
-          const delta = direction === 'h' 
-            ? e.clientY - startPos.current 
+          hasDragged.current = true;
+          const delta = direction === 'h'
+            ? e.clientY - startPos.current
             : e.clientX - startPos.current;
           onResize(delta);
           startPos.current = direction === 'h' ? e.clientY : e.clientX;
@@ -398,20 +354,32 @@
 
       const handleMouseDown = (e) => {
         isDragging.current = true;
+        hasDragged.current = false;
         startPos.current = direction === 'h' ? e.clientY : e.clientX;
         e.preventDefault();
       };
 
+      const handleClick = (e) => {
+        if (hasDragged.current) {
+          logger.debug('Resizer dragged, not activating container');
+          return;
+        }
+        logger.debug('Resizer clicked', { containerId });
+        onActivateContainer(containerId);
+        e.stopPropagation();
+      };
+
       return (
-        <div 
+        <div
           ref={containerRef}
           className={`resizer ${direction === 'h' ? 'horizontal' : 'vertical'}`}
           onMouseDown={handleMouseDown}
+          onClick={handleClick}
         />
       );
     }
 
-    function PaneContainer({ node, onSplit, onDelete, totalPanes, activeId, onActivate }) {
+    function PaneContainer({ node, onSplit, onDelete, totalPanes, activeId, onActivate, activeContainerId, onActivateContainer, onContainerSplit }) {
       if (!node.children) {
         return (
           <Pane
@@ -448,8 +416,10 @@
         });
       };
 
+      const isActive = activeContainerId === node.id;
+
       return (
-        <div ref={containerRef} className={`pane-container ${node.split === 'h' ? 'h-split' : 'v-split'}`}>
+        <div ref={containerRef} className={`pane-container ${node.split === 'h' ? 'h-split' : 'v-split'} ${isActive ? 'active' : ''}`}>
           {node.children.map((child, i) => (
             <React.Fragment key={child.id}>
               <div className="pane-wrapper" style={{ flex: sizes[i] }}>
@@ -460,16 +430,53 @@
                   totalPanes={totalPanes}
                   activeId={activeId}
                   onActivate={onActivate}
+                  activeContainerId={activeContainerId}
+                  onActivateContainer={onActivateContainer}
+                  onContainerSplit={onContainerSplit}
                 />
               </div>
               {i < node.children.length - 1 && (
                 <Resizer
                   direction={node.split}
                   onResize={(delta) => handleResize(i, delta)}
+                  containerId={node.id}
+                  onActivateContainer={onActivateContainer}
                 />
               )}
             </React.Fragment>
           ))}
+          {isActive && (
+            <>
+              <button
+                className="split-btn split-btn-container split-btn-container-top"
+                onClick={(e) => { e.stopPropagation(); onContainerSplit(node.id, 'h', 'before'); }}
+                title="Add pane above"
+              >
+                +
+              </button>
+              <button
+                className="split-btn split-btn-container split-btn-container-bottom"
+                onClick={(e) => { e.stopPropagation(); onContainerSplit(node.id, 'h', 'after'); }}
+                title="Add pane below"
+              >
+                +
+              </button>
+              <button
+                className="split-btn split-btn-container split-btn-container-left"
+                onClick={(e) => { e.stopPropagation(); onContainerSplit(node.id, 'v', 'before'); }}
+                title="Add pane to left"
+              >
+                +
+              </button>
+              <button
+                className="split-btn split-btn-container split-btn-container-right"
+                onClick={(e) => { e.stopPropagation(); onContainerSplit(node.id, 'v', 'after'); }}
+                title="Add pane to right"
+              >
+                +
+              </button>
+            </>
+          )}
         </div>
       );
     }
@@ -501,11 +508,42 @@
       return { ...node, children: newChildren };
     };
 
+    const insertPaneIntoContainer = (tree, containerId, direction, position) => {
+      logger.debug('insertPaneIntoContainer called', { containerId, direction, position });
+
+      const insert = (node) => {
+        if (node.id === containerId) {
+          const newPane = createPane();
+          const wrapper = {
+            id: genId(),
+            split: direction,
+            children: position === 'before' ? [newPane, node] : [node, newPane]
+          };
+          logger.debug('Wrapped container', { containerId, wrapperId: wrapper.id, newPaneId: newPane.id });
+          return { node: wrapper, newPaneId: newPane.id };
+        }
+
+        if (node.children) {
+          let foundPaneId = null;
+          const newChildren = node.children.map(child => {
+            const result = insert(child);
+            if (result.newPaneId) foundPaneId = result.newPaneId;
+            return result.node;
+          });
+          return { node: { ...node, children: newChildren }, newPaneId: foundPaneId };
+        }
+
+        return { node, newPaneId: null };
+      };
+
+      return insert(tree);
+    };
+
     function App() {
       const initialPane = createPane();
       const [tree, setTree] = useState(initialPane);
       const [activeId, setActiveId] = useState(initialPane.id);
-      const [isRootActive, setIsRootActive] = useState(false);
+      const [activeContainerId, setActiveContainerId] = useState(null);
 
       useEffect(() => {
         logger.debug('Tree structure', tree);
@@ -520,15 +558,17 @@
           if (node.id === targetId) {
             const pane1 = { id: genId(), color: node.color };
             const pane2 = createPane();
+            const containerId = genId();
             logger.debug('splitting target node', {
               targetId,
               direction,
+              containerId,
               newId1: pane1.id,
               newId2: pane2.id,
               inheritedColor: node.color
             });
             return {
-              id: node.id,
+              id: containerId,
               split: direction,
               children: [pane1, pane2]
             };
@@ -568,85 +608,39 @@
         }
       };
 
-      const wrapRootWithSplit = (direction, position) => {
-        logger.debug('wrapRootWithSplit called', { direction, position, treeBefore: tree });
-
-        const newPane = createPane();
-        const newRoot = {
-          id: genId(),
-          split: direction,
-          children: position === 'before' ? [newPane, tree] : [tree, newPane]
-        };
-
-        logger.debug('wrapRootWithSplit complete', { treeAfter: newRoot, newPaneId: newPane.id });
-
-        setTree(newRoot);
-        setActiveId(newPane.id);
-      };
-
       const handlePaneActivate = (paneId) => {
-        setIsRootActive(false);
+        setActiveContainerId(null);
         setActiveId(paneId);
       };
 
-      const handleRootActivate = () => {
-        setIsRootActive(true);
+      const handleContainerActivate = (containerId) => {
+        logger.debug('Container activated', { containerId });
+        setActiveId(null);
+        setActiveContainerId(containerId);
+      };
+
+      const handleContainerSplit = (containerId, direction, position) => {
+        logger.debug('Container split', { containerId, direction, position });
+        const result = insertPaneIntoContainer(tree, containerId, direction, position);
+        setTree(result.node);
+        setActiveId(result.newPaneId);
+        setActiveContainerId(null);
       };
 
       const totalPanes = countTotalPanes(tree);
 
       return (
-        <>
-          <div
-            className={`root-handle ${isRootActive ? 'active' : ''}`}
-            onClick={handleRootActivate}
-          >
-            ~ tmux
-          </div>
-          <div className="pane-container-wrapper">
-            <PaneContainer
-              node={tree}
-              onSplit={splitPane}
-              onDelete={deletePane}
-              totalPanes={totalPanes}
-              activeId={isRootActive ? null : activeId}
-              onActivate={handlePaneActivate}
-            />
-          </div>
-          {isRootActive && (
-            <>
-              <div className="root-active-indicator" />
-              <button
-                className="split-btn split-btn-viewport split-btn-viewport-top"
-                onClick={() => wrapRootWithSplit('h', 'before')}
-                title="Add pane above"
-              >
-                +
-              </button>
-              <button
-                className="split-btn split-btn-viewport split-btn-viewport-bottom"
-                onClick={() => wrapRootWithSplit('h', 'after')}
-                title="Add pane below"
-              >
-                +
-              </button>
-              <button
-                className="split-btn split-btn-viewport split-btn-viewport-left"
-                onClick={() => wrapRootWithSplit('v', 'before')}
-                title="Add pane to left"
-              >
-                +
-              </button>
-              <button
-                className="split-btn split-btn-viewport split-btn-viewport-right"
-                onClick={() => wrapRootWithSplit('v', 'after')}
-                title="Add pane to right"
-              >
-                +
-              </button>
-            </>
-          )}
-        </>
+        <PaneContainer
+          node={tree}
+          onSplit={splitPane}
+          onDelete={deletePane}
+          totalPanes={totalPanes}
+          activeId={activeId}
+          onActivate={handlePaneActivate}
+          activeContainerId={activeContainerId}
+          onActivateContainer={handleContainerActivate}
+          onContainerSplit={handleContainerSplit}
+        />
       );
     }
 
